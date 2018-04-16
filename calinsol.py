@@ -73,16 +73,17 @@ N2=N**2
 
 
 topo_file_name	= topo_file.split('/')[-1].split('.nc')[0]							# extract filename from full path
-topo_a1			= float(topo_file_name.split('a1_')[1].split('km')[0])*1000.0		# extract half-width from filename (requires filename to contain a1_)
+#topo_a1			= float(topo_file_name.split('a1_')[1].split('km')[0])*1000.0		# extract half-width from filename (requires filename to contain a1_)
 																					# better way would be to save it in nc-file.
 
-filenames		= "{:s}_N{:0.4f}_U{:3.1f}_V{:3.1f}".format(topo_file_name,N,U,V)		# filename template for plots
+filenames		= "{:s}_N{:0.4f}_U{:3.1f}_V{:3.1f}".format(topo_file_name,N,U,V)	# filename template for plots
 
-lambda_z		= 2*np.pi*U/np.sqrt(N2)										# calculate vertical wavelength
-scorer2			= N**2/U**2
-k2				= (1/topo_a1)**2
-regime_f		= np.sqrt(scorer2/k2)
-
+#lambda_z		= 2*np.pi*U/np.sqrt(N2)										# calculate vertical wavelength
+#scorer2			= N**2/U**2
+#k2				= (1/topo_a1)**2
+#regime_f		= np.sqrt(scorer2/k2)
+regime = ''
+'''
 if regime_f <= 0.1:
 	regime="irrotational_flow"
 elif regime_f > 0.1 and regime_f <= 1:
@@ -91,9 +92,9 @@ elif regime_f > 1 and regime_f <= 10:
 	regime="vert_prop_waves"
 elif regime_f > 10:
 	regime="hydrostatic_waves"
+'''
 
-
-
+'''
 print "  * some variables"
 print "      half width of topography: {:4.0f}m".format(topo_a1)
 print "      vertical wavelength     : {:4.0f}m".format(lambda_z)
@@ -101,6 +102,7 @@ print "      scorer parameter        : {:f}".format(np.sqrt(scorer2))
 print "      k parameter             : {:f}".format(np.sqrt(k2))
 print "      regime parameter        : {:f}".format(regime_f)
 print "      regime                  : {:s}".format(regime)
+'''
 Nx_in	= topo_in.shape[1]
 Ny_in	= topo_in.shape[0]
 Lx_in	= dx*Nx_in
@@ -205,6 +207,7 @@ fx_raw = np.fft.fftfreq(Nx,dx)
 fy_raw = np.fft.fftfreq(Ny,dy)
 
 # find position closest to what vertical wavelenght is:
+'''
 lambda_z_i = -1
 for z_i, z in enumerate(lvls):
 	#print z_i, " ",z, " ",(lambda_z-lvls[z_i+1])," ",(lambda_z-z)
@@ -214,7 +217,7 @@ for z_i, z in enumerate(lvls):
 			break
 		else:
 			pass
-
+'''
 print "  * calculating linear solution..."
 field_w_r = np.empty(Nx*Ny*Nz,dtype=np.complex_).reshape(Nz,Ny,Nx)
 field_u_r = np.empty(Nx*Ny*Nz,dtype=np.complex_).reshape(Nz,Ny,Nx)
@@ -235,10 +238,12 @@ for k in range(0,Nz):
 		for j in range(0,Ny):
 			# only if different N for different levels:
 			
+			'''
 			if z <= 4000:
 				N2 = (0.01047)**2
 			else:
 				N2 = (0.004188)**2
+			'''
 			
 			sigma	= (U*k_raw[i]+V*l_raw[j])
 			m2_nom	= (N2-sigma**2)*(k_raw[i]**2+l_raw[j]**2)
@@ -438,9 +443,8 @@ plt.grid()
 #plt.xlim(50,150)
 plt.savefig("./plot_{:s}_V_field.png".format(filenames),dpi=300)
 plt.close()
-
 plt.clf()
-
+'''
 z_start = lambda_z_i
 while z_start > 2:
 	z_start-=2
@@ -464,4 +468,4 @@ plt.ylabel('altitude (km)')
 plt.ylim(0,lvls[-1]/1000.0)
 plt.savefig("./plot_{:s}_eta_field.png".format(filenames),dpi=300)
 plt.close()
-
+'''
