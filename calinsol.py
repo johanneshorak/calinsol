@@ -89,21 +89,21 @@ lat		= in_file.XLAT_M
 #lat		= in_file.XLAT_M[nyc-nyseg:nyc+nyseg]
 
 
-dx=1000.0
-dy=1000.0
+dx=2000.0
+dy=2000.0
 N2=N**2
 
 
 topo_file_name	= topo_file.split('/')[-1].split('.nc')[0]							# extract filename from full path
 
-filenames		= "{:s}_N{:0.4f}_U{:3.1f}_V{:3.1f}".format(topo_file_name,N,U,V)	# filename template for plots
+filenames    = "{:s}_N{:0.4f}_U{:3.1f}_V{:3.1f}".format(topo_file_name,N,U,V)	# filename template for plots
 
-lambda_z		= 2*np.pi*U/N										# calculate vertical wavelength
-scorer2			= N**2/U**2
-k2			= (1/topo_a1)**2
-regime_f		= np.sqrt(scorer2/k2)
-Fr = U/(N*topo_a0)
-regime = ''
+lambda_z     = 2*np.pi*U/N										# calculate vertical wavelength
+scorer2      = N**2/U**2
+k2           = (1/topo_a1)**2
+regime_f     = np.sqrt(scorer2/k2)
+Fr           = U/(N*topo_a0)
+regime       = ''
 
 if regime_f <= 0.1:
 	regime="irrotational_flow"
@@ -196,14 +196,14 @@ for z_i, z in enumerate(lvls):
 			pass
 
 print("  * calculating linear solution...")
-field_z   = np.zeros(Nx*Ny*Nz).reshape(Nz,Ny,Nx)
-field_w_r = np.empty(Nx*Ny*Nz,dtype=np.complex_).reshape(Nz,Ny,Nx)
-field_u_r = np.empty(Nx*Ny*Nz,dtype=np.complex_).reshape(Nz,Ny,Nx)
-field_v_r = np.empty(Nx*Ny*Nz,dtype=np.complex_).reshape(Nz,Ny,Nx)
-field_p_r = np.empty(Nx*Ny*Nz,dtype=np.complex_).reshape(Nz,Ny,Nx)
-field_eta_r = np.empty(Nx*Ny*Nz,dtype=np.complex_).reshape(Nz,Ny,Nx)
-field_m_re = np.empty(Nx*Ny).reshape(Ny,Nx)
-field_m_im = np.empty(Nx*Ny).reshape(Ny,Nx)
+field_z      = np.zeros(Nx*Ny*Nz).reshape(Nz,Ny,Nx)
+field_w_r    = np.empty(Nx*Ny*Nz,dtype=np.complex_).reshape(Nz,Ny,Nx)
+field_u_r    = np.empty(Nx*Ny*Nz,dtype=np.complex_).reshape(Nz,Ny,Nx)
+field_v_r    = np.empty(Nx*Ny*Nz,dtype=np.complex_).reshape(Nz,Ny,Nx)
+field_p_r    = np.empty(Nx*Ny*Nz,dtype=np.complex_).reshape(Nz,Ny,Nx)
+field_eta_r  = np.empty(Nx*Ny*Nz,dtype=np.complex_).reshape(Nz,Ny,Nx)
+field_m_re   = np.empty(Nx*Ny).reshape(Ny,Nx)
+field_m_im   = np.empty(Nx*Ny).reshape(Ny,Nx)
 
 field_u_real = np.empty(Nx*Ny*Nz).reshape(Nz,Ny,Nx)
 field_w_real = np.empty(Nx*Ny*Nz).reshape(Nz,Ny,Nx)
@@ -216,13 +216,6 @@ for k in range(0,Nz):
 		for j in range(0,Ny):
 			# only if different N for different levels:
 			field_z[k,j,i] = topo_mod[j,i] + z
-			#print topo_mod[j,i],' ',z,' ',field_z[k,j,i]
-			'''
-			if z <= 4000:
-				N2 = (0.01047)**2
-			else:
-				N2 = (0.004188)**2
-			'''
 			
 			sigma	 = (U*k_raw[i]+V*l_raw[j])
 			m2_nom	 = (N2-sigma**2)*(k_raw[i]**2+l_raw[j]**2)
@@ -277,6 +270,7 @@ for k in range(0,Nz):
 				p_r=(1j*eta_r/m)*(N2-sigma**2)
 				u_r=-(m*(sigma*k_raw[i]-1j*l_raw[j]*f)*1j*eta_r)/(k_raw[i]**2+l_raw[j]**2)
 				v_r=-(m*(sigma*l_raw[j]+1j*k_raw[i]*f)*1j*eta_r)/(k_raw[i]**2+l_raw[j]**2)
+                                
 			field_m_re[j,i]=np.real(m)
 			field_m_im[j,i]=np.imag(m)
 			field_eta_r[k,j,i]=eta_r
