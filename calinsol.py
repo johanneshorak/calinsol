@@ -1,6 +1,6 @@
 # -------------------------------------------------------
-# author		: Johannes Horak
-# contact		: johannes.horak@uibk.ac.at
+# author        : Johannes Horak
+# contact        : johannes.horak@uibk.ac.at
 # -------------------------------------------------------
 # this script calculates the pertubations to a background
 # wind-field as predicted by linear theory.
@@ -16,89 +16,112 @@ import pyfftw as pyfftw
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
+import lib.utilities as utl
 
 def mwrite(string):
-	sys.stdout.write(string)
-	sys.stdout.flush()
+    sys.stdout.write(string)
+    sys.stdout.flush()
+        
+def get_topo(x,topo='witch',a0=1000,a1=20000):
+    if topo == 'witch':
+        h=a0*(a1**2/(x**2+a1**2))                # topography
+    elif topo == 'triangle':
+        if np.abs(x) <= a1/2.0:
+                k = np.sign(x)
+                h = -np.sign(x)*x*2.0*(a0/a1)+a0
+        else:
+            h = 0.0
+    elif topo=="sine":
+        h=a0/2.0+a0/2.0*np.sin((np.pi/a1)*(x-a1/2.0))        # sine with the minimum at domain center
+    return h
 
-topo_file		= None
-zero_borders	= False
-Nz				= 20
-dz				= 1000.0
-U				= 10.0
-N				= 0.01
-V				= 0.0
-f				= 0.0000001#1.454*10**(-4)
-parsonly                        = False
+topo_file    = None
+zero_borders = False
+Nz           = 100
+dz           = 200.0
+U            = 20.0
+N            = 0.01
+V            = 0.0
+f            = 0.0 #000001
+parsonly     = False
 topo_a0 = None
 topo_a1 = None
 # READ COMMAND LINE OPTIONS
 try:
-	opts, args = getopt.getopt(sys.argv[1:],"h",["topo=","zeroborders","help","nz=","dz=","U=","N=","a0=","a1=","parsonly"])
-	if len(opts)==0:
-		print("  error occured - no parameters given!")
-		sys.exit(1)
+    opts, args = getopt.getopt(sys.argv[1:],"h",["topo=","zeroborders","help","nz=","dz=","U=","N=","a0=","a1=","parsonly"])
+    if len(opts)==0:
+        print("  error occured - no parameters given!")
+        sys.exit(1)
 except getopt.GetoptError:
-	print("  error occured!")
-	sys.exit(2)
+    print("  error occured!")
+    sys.exit(2)
 for opt, arg in opts:
-	#print opt," ",arg
-	if opt in ("-h","--help"):
-		print("  help not yet available!")
-		sys.exit()
-	elif opt in ("--topo"):
-		topo_file=arg
-	elif opt in ("--zeroborders"):
-		zero_borders=True
-	elif opt in ("--nz"):
-		Nz = int(arg)
-	elif opt in ("--dz"):
-		dz = float(arg)
-	elif opt in ("--U"):
-		U  = float(arg)
-	elif opt in ("--N"):
-		N  = float(arg)
-	elif opt in ("--a1"):
-		topo_a1  = float(arg)
-	elif opt in ("--a0"):
-		topo_a0 = float(arg)
+    #print opt," ",arg
+    if opt in ("-h","--help"):
+        print("  help not yet available!")
+        sys.exit()
+    elif opt in ("--topo"):
+        topo_file=arg
+    elif opt in ("--zeroborders"):
+        zero_borders=True
+    elif opt in ("--nz"):
+        Nz = int(arg)
+    elif opt in ("--dz"):
+        dz = float(arg)
+    elif opt in ("--U"):
+        U  = float(arg)
+    elif opt in ("--N"):
+        N  = float(arg)
+    elif opt in ("--a1"):
+        topo_a1  = float(arg)
+    elif opt in ("--a0"):
+        topo_a0 = float(arg)
 
-	elif opt in ("--parsonly"):
-		parsonly = True
+    elif opt in ("--parsonly"):
+        parsonly = True
 
-if topo_file is None:
-	print("  error: no topography file specified!")
-
-
-print('Nz             {:n}'.format(Nz))
-print('dz             {:n}'.format(dz))
-print('U              {:2.0f}'.format(U))
-print('N              {:2.4f}'.format(N))
-
-in_file	= xa.open_dataset(topo_file)
-topo_in	= in_file.HGT_M.values
-
-# reduce y dimension of topography
-#print('* reducing y-dimension of topography (assuming that it depends only on x)')
-#nyc     = int(topo_in.shape[0]/2.0)
-#nyseg   = nyc-1
-#topo_in = topo_in[nyc-nyseg:nyc+nyseg,:]
-
-lon		= in_file.XLONG_M
-lat		= in_file.XLAT_M
-#lat		= in_file.XLAT_M[nyc-nyseg:nyc+nyseg]
+#if topo_file is None:
+#    print("  error: no topography file specified!")
 
 
-dx=2000.0
-dy=2000.0
-N2=N**2
+print('Nz {:n}'.format(Nz))
+print('dz {:n}'.format(dz))
+print('U  {:2.0f}'.format(U))
+print('N  {:2.4f}'.format(N))
+
+# create the topography
 
 
-topo_file_name	= topo_file.split('/')[-1].split('.nc')[0]							# extract filename from full path
+Nx_in = 404
+Ny_in = 5
+dx    = 2000.0
+dy    = 2000.0
+N2    = N**2
 
-filenames    = "{:s}_N{:0.4f}_U{:3.1f}_V{:3.1f}".format(topo_file_name,N,U,V)	# filename template for plots
+lonc = 90.0
+latc = 0.0
 
-lambda_z     = 2*np.pi*U/N										# calculate vertical wavelength
+topo_in = np.zeros(Ny_in*Nx_in).reshape(Ny_in,Nx_in)
+
+for nx in range(Nx_in):
+    x = (nx-Nx_in/2.0)*dx
+    topo_in[:,nx] = get_topo(x,topo='witch',a0=topo_a0,a1=topo_a1)
+
+ddeg = utl.find_angle_for_dx(dx=dx,lonc=lonc,latc=latc)
+
+lon = (np.arange(0,Nx_in,1.0)-np.floor(Nx_in/2.0))*ddeg+lonc
+lat = (np.arange(0,Ny_in,1.0)-np.floor(Ny_in/2.0))*ddeg+latc
+
+Lx_in    = dx*Nx_in
+Ly_in    = dy*Ny_in
+Lz    = dz*Nz
+xs_in    = (np.arange(0,Nx_in)-np.floor(Nx_in/2.0))*dx/1000.0
+ys_in    = (np.arange(0,Ny_in)-np.floor(Ny_in/2.0))*dy/1000.0
+lvls    = (np.arange(0,Nz)+0.5)*dz
+
+filenames    = "{:s}_N{:0.4f}_U{:3.1f}_V{:3.1f}".format('witch',N,U,V)    # filename template for plots
+
+lambda_z     = 2*np.pi*U/N                                        # calculate vertical wavelength
 scorer2      = N**2/U**2
 k2           = (1/topo_a1)**2
 regime_f     = np.sqrt(scorer2/k2)
@@ -106,13 +129,13 @@ Fr           = U/(N*topo_a0)
 regime       = ''
 
 if regime_f <= 0.1:
-	regime="irrotational_flow"
+    regime="irrotational_flow"
 elif regime_f > 0.1 and regime_f <= 1:
-	regime="evanescent_flow"
+    regime="evanescent_flow"
 elif regime_f > 1 and regime_f <= 10:
-	regime="vert_prop_waves"
+    regime="vert_prop_waves"
 elif regime_f > 10:
-	regime="hydrostatic_waves"
+    regime="hydrostatic_waves"
 
 
 print("  * some variables")
@@ -127,18 +150,10 @@ print("      regime                  : {:s}".format(regime))
 if parsonly:
     sys.exit(1)
 
-Nx_in	= topo_in.shape[1]
-Ny_in	= topo_in.shape[0]
 
-Lx_in	= dx*Nx_in
-Ly_in	= dy*Ny_in
-Lz	= dz*Nz
-xs_in	= np.arange(0,Nx_in)*dx/1000.0
-ys_in	= np.arange(0,Ny_in)*dy/1000.0
-lvls	= (np.arange(0,Nz)+0.5)*dz
 
 print("  * not forcing topography to zero at boundaries")
-topo	 = topo_in.copy()
+topo     = topo_in.copy()
 topo_mod = topo_in.copy()
 
 Nx = Nx_in
@@ -155,7 +170,21 @@ topo_fft_shifted = np.fft.fftshift(topo_fft)
 
 
 
-# calculate wave numbers
+# set the wave numbers
+# luckily numpy can do the for us. The coefficient 2*pi comes from the
+# Fourier transformation applied in Smith 2003:
+# Smith, 2003 - A linear upslope time-delay model for orographic precipitation
+fx_raw = np.fft.fftfreq(Nx,dx)
+fy_raw = np.fft.fftfreq(Ny,dy)
+
+k_raw = 2*np.pi*fx_raw
+l_raw = 2*np.pi*fy_raw
+
+'''
+# ----------------------------------------------------------------------
+# Here's the code to calculate the wave-numbers manually:
+# This will eventually be removed from the source
+# ----------------------------------------------------------------------
 dkx=2.0*np.pi/Lx
 dky=2.0*np.pi/Ly
 
@@ -179,21 +208,19 @@ for i in range(0,Ny):
 
 k_raw=k_raw
 l_raw=l_raw
+'''
 
-fx_raw = np.fft.fftfreq(Nx,dx)
-fy_raw = np.fft.fftfreq(Ny,dy)
 
 # find position closest to what vertical wavelenght is:
-
+# used for later plots
 lambda_z_i = -1
 for z_i, z in enumerate(lvls):
-	#print z_i, " ",z, " ",(lambda_z-lvls[z_i+1])," ",(lambda_z-z)
-	if z_i < len(lvls)-1:
-		if np.abs(lambda_z-lvls[z_i+1]) > np.abs(lambda_z-z):
-			lambda_z_i = z_i
-			break
-		else:
-			pass
+    if z_i < len(lvls)-1:
+        if np.abs(lambda_z-lvls[z_i+1]) > np.abs(lambda_z-z):
+            lambda_z_i = z_i
+            break
+        else:
+            pass
 
 print("  * calculating linear solution...")
 field_z      = np.zeros(Nx*Ny*Nz).reshape(Nz,Ny,Nx)
@@ -208,97 +235,99 @@ field_m_im   = np.empty(Nx*Ny).reshape(Ny,Nx)
 field_u_real = np.empty(Nx*Ny*Nz).reshape(Nz,Ny,Nx)
 field_w_real = np.empty(Nx*Ny*Nz).reshape(Nz,Ny,Nx)
 
+SMALL_VALUE = 10**-15
 
 for k in range(0,Nz):
-	mwrite("     working on z level {:n}/{:n}\r".format(k+1,Nz))
-	z = dz*(0.5+k)
-	for i in range(0,Nx):
-		for j in range(0,Ny):
-			# only if different N for different levels:
-			field_z[k,j,i] = topo_mod[j,i] + z
-			
-			sigma	 = (U*k_raw[i]+V*l_raw[j])
-			m2_nom	 = (N2-sigma**2)*(k_raw[i]**2+l_raw[j]**2)
-			m2_denom = (sigma**2-f**2)
-			
-			if m2_denom == 0:
-				m2	= 0
-				print("m denominator was zero")
-			else:
-				m2	= m2_nom/m2_denom
+    mwrite("     working on z level {:n}/{:n}\r".format(k+1,Nz))
 
-			if m2 == np.inf:
-				m = np.inf
-			else:
-				if N2 > sigma**2:
-					if m2 < 0:
-						m=1j*np.sqrt(-m2)*np.sign(sigma)
-					else:
-						m=np.sqrt(m2)*np.sign(sigma)
-					if np.isnan(m):
-						print("had ",m2)
-						print("nom: ",m2_nom)
-						print("denom: ",m2_denom)
-						print("k=",k_raw[i])
-						print("l=",l_raw[j])
-						print("sigma=",sigma)
-						sys.exit(0)
-				elif sigma**2 <= N2:
-					m=1j*np.sqrt(m2)
-			
-			eta_r=topo_fft[j,i]*np.exp(1j*m*z)
+    for i in range(0,Nx):
+        for j in range(0,Ny):
+            z = dz*(0.5+k)+topo_mod[j,i]                                # topography following coordinate system - seems to work for above zero as well though.
+            
+            field_z[k,j,i] = z 
+            
+            kl2  = (k_raw[i]**2+l_raw[j]**2)
+            if kl2 < SMALL_VALUE:
+                kl2 = SMALL_VALUE
+            
+            sigma     = (U*k_raw[i]+V*l_raw[j])                         # sigma can be zero, approximate it by a small value if that's the case
+            if sigma < SMALL_VALUE:
+                sigma = SMALL_VALUE # small value, same as in icar
 
-			if m == 0:
-				w_r=1j*sigma*eta_r
-				p_r=0 #1j*np.inf
-				u_r=0.0
-				v_r=0.0
-			elif k_raw[i]**2+l_raw[j]**2 == 0:
-				w_r=1j*sigma*eta_r
-				p_r=(1j*eta_r/m)*(N2-sigma**2)
-				if np.isnan(p_r):
-					sys.exit(2)
-				u_r=-1j*np.inf
-				v_r=-1j*np.inf
-			elif m == np.inf:
-				w_r = np.inf
-				u_r = np.inf
-				v_r = np.inf
-				p_r = 0
-			else:
-				w_r=1j*sigma*eta_r
-				p_r=(1j*eta_r/m)*(N2-sigma**2)
-				u_r=-(m*(sigma*k_raw[i]-1j*l_raw[j]*f)*1j*eta_r)/(k_raw[i]**2+l_raw[j]**2)
-				v_r=-(m*(sigma*l_raw[j]+1j*k_raw[i]*f)*1j*eta_r)/(k_raw[i]**2+l_raw[j]**2)
-                                
-			field_m_re[j,i]=np.real(m)
-			field_m_im[j,i]=np.imag(m)
-			field_eta_r[k,j,i]=eta_r
-			field_w_r[k,j,i]=w_r
-			field_u_r[k,j,i]=u_r
-			field_v_r[k,j,i]=v_r
-			field_p_r[k,j,i]=p_r
+            m2_nom    = (N2-sigma**2)*kl2                               # equation (A12, nominator)
+            m2_denom  = (sigma**2-f**2)                                 # equation (A12, demonimator)
+
+            if m2_denom == 0.:                                           # this shouldn't happen, we check nonetheless
+                print("m**2 : denominator was zero")
+                print("sigma: ",sigma)
+                print("nom  : ",m2_nom)
+                print(m2_nom/(10**-15))
+                sys.exit(1)
+            else:
+                m2    = m2_nom/m2_denom
+
+            # Have to look this up again - correct root necessary to correspond to decay or radiation BC
+            # See Smith 2004 (a linear theory of orography precipitation)
+            if l_raw[j] < SMALL_VALUE:                                                          
+                m = np.sign(k_raw[i])*np.sqrt(N2)/U                     # equation (14) in Smith 2004
+            elif N2 > sigma**2:                                          
+                m = np.sqrt((N2/sigma**2)*kl2)*np.sign(sigma)           # equation (13) in Smith 2004
+                    
+                if np.isnan(m):                                         # this should not happen, but if it does we quit with an error
+                    print("error, not sure how this happened!")
+                    print("had m**2 = ",m2)
+                    print(" nominator  : ",m2_nom)
+                    print(" denominator: ",m2_denom)
+                    print("k    :",k_raw[i])
+                    print("l    :",l_raw[j])
+                    print("sigma: ",sigma)
+                    sys.exit(1)
+            elif N2 < sigma**2:                
+                m = 1j*np.sqrt(kl2)                                     # see text before equation (13) in Smith 2004
+            else:
+                m = 0.
+
+            eta_r = topo_fft[j,i]*np.exp(1j*m*z)                        # equation (A6) - parcel displacement calculation,
+            
+            
+            if (np.real(m) < SMALL_VALUE) & (np.imag(m) < SMALL_VALUE):
+                m = SMALL_VALUE
+                
+            w_r = 1j*sigma*eta_r
+            p_r = (1j*eta_r/m)*(N2-sigma**2)
+            
+            u_r = -(m*(sigma*k_raw[i])*1j*eta_r)/kl2
+            v_r = -(m*(sigma*l_raw[j])*1j*eta_r)/kl2
+            
+            
+            field_m_re[j,i]=np.real(m)
+            field_m_im[j,i]=np.imag(m)
+            field_eta_r[k,j,i]=eta_r
+            field_w_r[k,j,i]=w_r
+            field_u_r[k,j,i]=u_r
+            field_v_r[k,j,i]=v_r
+            field_p_r[k,j,i]=p_r
 
 
 print("")
 print("  * performing inverse fourier transforms")
 print('     transforming eta')
-field_eta_complex	= np.fft.ifft2(field_eta_r)
-field_eta_real		= np.real(field_eta_complex)
+field_eta_complex     = np.fft.ifft2(field_eta_r)
+field_eta_real        = np.real(field_eta_complex)
 print('     transforming u')
-field_u_complex		= np.fft.ifft2(field_u_r)
-field_u_real		= np.real(field_u_complex)
-#field_u_real		= correct_y_axis(field_u_real)
+field_u_complex        = np.fft.ifft2(field_u_r)
+field_u_real        = np.real(field_u_complex)
+#field_u_real        = correct_y_axis(field_u_real)
 print('     transforming v')
-field_v_complex		= np.fft.ifft2(field_v_r)
-field_v_real		= np.real(field_v_complex)
+field_v_complex        = np.fft.ifft2(field_v_r)
+field_v_real        = np.real(field_v_complex)
 print('     transforming w')
-field_w_complex		= np.fft.ifft2(field_w_r)
-field_w_real		= np.real(field_w_complex)
+field_w_complex        = np.fft.ifft2(field_w_r)
+field_w_real        = np.real(field_w_complex)
 print('     transforming p')
-field_p_complex		= np.fft.ifft2(field_p_r)
-field_p_real		= np.real(field_p_complex)
-#field_w_real		= correct_y_axis(field_w_real)
+field_p_complex        = np.fft.ifft2(field_p_r)
+field_p_real        = np.real(field_p_complex)
+#field_w_real        = correct_y_axis(field_w_real)
 
 
 print(' maximum updraft  : {:2.1f}'.format(np.max(field_w_real)))
@@ -307,51 +336,66 @@ print(' maximum downdraft: {:2.1f}'.format(np.min(field_w_real)))
 print "  * setting everything below topography to nan"
 
 for k in range(0,Nz):
-	for i in range(0,Nx):
-		for j in range(0,Ny):
-			if np.isnan(topo[j,i]):
-				print i,' ',j,' ',topo[j,i]
-			else:
-				if topo[j,i] > lvls[k]:
-					field_w_real[k,j,i]=np.nan
-					field_u_real[k,j,i]=np.nan
-					field_v_real[k,j,i]=np.nan
+    for i in range(0,Nx):
+        for j in range(0,Ny):
+            if np.isnan(topo[j,i]):
+                print i,' ',j,' ',topo[j,i]
+            else:
+                if topo[j,i] > lvls[k]:
+                    field_w_real[k,j,i]=np.nan
+                    field_u_real[k,j,i]=np.nan
+                    field_v_real[k,j,i]=np.nan
 '''
-		
+        
 print("  * creating and writing output netcdf")
-		
-output_ds	= xa.Dataset(
-							data_vars={
-								'U':(['bottom_top','south_north','west_east'],field_u_real+U),
-								'V':(['bottom_top','south_north','west_east'],field_v_real+V),
-								'w':(['bottom_top','south_north','west_east'],field_w_real),
-								'u':(['bottom_top','south_north','west_east'],field_u_real),
-								'v':(['bottom_top','south_north','west_east'],field_v_real),
-								'p':(['bottom_top','south_north','west_east'],field_p_real),
+
+output_ds    = xa.Dataset(
+                        data_vars={
+                                'par_N':N,
+                                'par_U':U,
+                                'par_V':V,
+                                'par_a0':topo_a0,
+                                'par_a1':topo_a1,
+                                'par_nz':Nz,
+                                'par_dz':dz,
+                                'par_Fr':Fr,
+                                'par_scorer':np.sqrt(scorer2),
+                                'U':(['bottom_top','south_north','west_east'],field_u_real+U),
+                                'V':(['bottom_top','south_north','west_east'],field_v_real+V),
+                                'w':(['bottom_top','south_north','west_east'],field_w_real),
+                                'u':(['bottom_top','south_north','west_east'],field_u_real),
+                                'v':(['bottom_top','south_north','west_east'],field_v_real),
+                                'p':(['bottom_top','south_north','west_east'],field_p_real),
                                 'z':(['bottom_top','south_north','west_east'],field_z),
-								'w_real':(['bottom_top','south_north','west_east'],np.abs(field_w_r)),
-								'pr_re':(['bottom_top','south_north','west_east'],np.real(np.fft.fftshift(field_p_r))),
-								'pr_im':(['bottom_top','south_north','west_east'],np.imag(np.fft.fftshift(field_p_r))),
-								'eta':(['bottom_top','south_north','west_east'],field_eta_real),
-								'fx':(['west_east'],fx_raw),
-								'k':(['west_east'],k_raw),
-								'm_re':(['south_north','west_east'],field_m_re),
-								'm_im':(['south_north','west_east'],field_m_im),
-								'topo':(['south_north','west_east'],topo),
-								'topo_mod':(['south_north','west_east'],topo_mod),
-								'topo_im':(['south_north','west_east'],np.real(np.fft.fftshift(topo_fft))),
-								'topo_re':(['south_north','west_east'],np.imag(np.fft.fftshift(topo_fft)))
-							},
-							coords={
-								'bottom_top':np.arange(0.5,Nz+0.5,1.0)*dz,
-								'south_north':np.arange(0,Ny,1.0),
-								'west_east':np.arange(0,Nx,1.0)
-							}
-						)
-output_ds.to_netcdf("./output.nc".format(topo_file_name),format='NETCDF4')	
+                                'w_real':(['bottom_top','south_north','west_east'],np.abs(field_w_r)),
+                                'pr_re':(['bottom_top','south_north','west_east'],np.real(np.fft.fftshift(field_p_r))),
+#                                'pr_im':(['bottom_top','south_north','west_east'],np.imag(np.fft.fftshift(field_p_r))),
+                                'eta':(['bottom_top','south_north','west_east'],field_eta_real),
+                                'fx':(['west_east'],fx_raw),
+                                'k':(['west_east'],k_raw),
+                                'l':(['south_north'],l_raw),
+#                                'm_re':(['south_north','west_east'],field_m_re),
+#                                'm_im':(['south_north','west_east'],field_m_im),
+                                'topo':(['south_north','west_east'],topo),
+                                'topo_mod':(['south_north','west_east'],topo_mod),
+#                                'topo_im':(['south_north','west_east'],np.real(np.fft.fftshift(topo_fft))),
+                                'topo_re':(['south_north','west_east'],np.imag(np.fft.fftshift(topo_fft)))
+                        },
+                        coords={
+                                'x':xs_in,
+                                'y':ys_in,
+                                'bottom_top' :np.arange(0.5,Nz+0.5,1.0)*dz,
+                                'south_north':np.arange(0,Ny,1.0),
+                                'west_east'  :np.arange(0,Nx,1.0)
+                        }
+                )
+                
+output_ds.attrs['info']='generated with calinsol\ninput parameters stored as coordinate and dimensionless variables with prefix par_'
+
+output_ds.to_netcdf("./output.nc",format='NETCDF4')    
 
 # plot some quantities
-y_cross=100#int(Ny/2)
+y_cross=int(np.floor(Ny_in/2))
 
 U_field = (field_u_real+U)[:,y_cross,:]
 V_field = (field_v_real+V)[:,y_cross,:]
@@ -420,15 +464,15 @@ plt.clf()
 
 z_start = lambda_z_i
 while z_start > 2:
-	z_start-=2
+    z_start-=2
 dnz=int(Nz/15.0)
 for z_i in range(z_start,Nz,dnz):
-	streamline=(field_eta_real[z_i,y_cross,:]+lvls[z_i])/1000.0
-	baseline=np.ones(len(streamline))*lvls[z_i]/1000.0
-	plt.fill_between(xs,streamline, baseline, facecolor="none", hatch="|", edgecolor="gray", linewidth=0.0, interpolate=True)
-	plt.plot(xs, streamline,color='gray',lw=1)
-	plt.plot([xs[0],xs[-1]], [lvls[z_i]/1000.0,lvls[z_i]/1000.0],color='gray',lw=1)
-	
+    streamline=(field_eta_real[z_i,y_cross,:]+lvls[z_i])/1000.0
+    baseline=np.ones(len(streamline))*lvls[z_i]/1000.0
+    plt.fill_between(xs,streamline, baseline, facecolor="none", hatch="|", edgecolor="gray", linewidth=0.0, interpolate=True)
+    plt.plot(xs, streamline,color='gray',lw=1)
+    plt.plot([xs[0],xs[-1]], [lvls[z_i]/1000.0,lvls[z_i]/1000.0],color='gray',lw=1)
+    
 #plt.contour(xs,lvls/1000.0,field_eta_real[:,y_cross,:])
 plt.fill_between(xs, 0, topo_mod[y_cross,:]/1000.0,facecolor='white', interpolate=True)
 plt.plot(xs,topo_mod[y_cross,:]/1000.0,lw=1,c="black")
